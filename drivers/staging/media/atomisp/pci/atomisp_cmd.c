@@ -3650,7 +3650,7 @@ static void atomisp_fill_pix_format(struct v4l2_pix_format *f,
 	else
 		f->bytesperline = bytes;
 
-	f->sizeimage = height * bytes;
+	f->sizeimage = PAGE_ALIGN(height * bytes);
 
 	if (f->field == V4L2_FIELD_ANY)
 		f->field = V4L2_FIELD_NONE;

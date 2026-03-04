@@ -2020,6 +2020,7 @@ const struct v4l2_ioctl_ops atomisp_ioctl_ops = {
 	.vidioc_s_fmt_vid_cap = atomisp_s_fmt_cap,
 	.vidioc_reqbufs = vb2_ioctl_reqbufs,
 	.vidioc_querybuf = vb2_ioctl_querybuf,
+	.vidioc_expbuf = vb2_ioctl_expbuf,
 	.vidioc_qbuf = atomisp_qbuf_wrapper,
 	.vidioc_dqbuf = atomisp_dqbuf_wrapper,
 	.vidioc_streamon = vb2_ioctl_streamon,
