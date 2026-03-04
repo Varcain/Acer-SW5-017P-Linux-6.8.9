@@ -99,7 +99,9 @@ struct atomisp_video_pipe *atomisp_to_video_pipe(struct video_device *dev)
 
 static unsigned short atomisp_get_sensor_fps(struct atomisp_sub_device *asd)
 {
-	struct v4l2_subdev_frame_interval fi = { 0 };
+	struct v4l2_subdev_frame_interval fi = {
+		.which = V4L2_SUBDEV_FORMAT_ACTIVE,
+	};
 	struct atomisp_device *isp = asd->isp;
 
 	unsigned short fps = 0;
@@ -3648,7 +3650,7 @@ static void atomisp_fill_pix_format(struct v4l2_pix_format *f,
 	else
 		f->bytesperline = bytes;
 
-	f->sizeimage = PAGE_ALIGN(height * bytes);
+	f->sizeimage = height * bytes;
 
 	if (f->field == V4L2_FIELD_ANY)
 		f->field = V4L2_FIELD_NONE;

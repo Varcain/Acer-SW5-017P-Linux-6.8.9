@@ -57,6 +57,17 @@ config VIDEO_ATOMISP_GC0310
 	  This is a Video4Linux2 sensor-level driver for the Galaxycore
 	  GC0310 0.3MP sensor.
 
+config VIDEO_ATOMISP_OV5670
+	tristate "OV5670 sensor support for ATOMISP"
+	depends on ACPI
+	depends on I2C && VIDEO_DEV
+	help
+	  This is a Video4Linux2 sensor driver for the OmniVision OV5670
+	  5MP camera sensor, adapted for Cherry Trail ATOMISP platforms
+	  (e.g. Acer SW5-017P). Uses OVTI5670 ACPI HID and 19.2MHz PMC clock.
+
+	  It currently only works with the atomisp driver.
+
 #
 # Kconfig for flash drivers
 #

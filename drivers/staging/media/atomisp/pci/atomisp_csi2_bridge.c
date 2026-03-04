@@ -717,5 +717,101 @@ err_parse:
 		return ret;
 	}
 
+	/*
+	 * Fallback: discover ACPI sensors not in ipu-bridge's
+	 * ipu_supported_sensors[] list. These sensors have proper ACPI _DSM
+	 * methods for CSI configuration but weren't found by ipu_bridge_init(),
+	 * so no fwnode graph endpoints were created for them. We add async
+	 * connections directly using the sensor's ACPI fwnode.
+	 */
+	{
+		static const char * const fallback_hids[] = {
+			"OVTI5670",	/* OV5670 on Acer SW5-017P */
+			NULL,
+		};
+		const char * const *hid;
+		int found = 0;
+
+		dev_info(isp->dev, "Checking for fallback ACPI sensors...\n");
+
+		for (hid = fallback_hids; *hid; hid++) {
+			struct acpi_device *adev;
+
+			dev_info(isp->dev, "Scanning for ACPI HID: %s\n", *hid);
+
+			for_each_acpi_dev_match(adev, *hid, NULL, -1) {
+				struct sensor_async_subdev *s_asd;
+				int port, clock_num, lanes;
+
+				dev_info(isp->dev,
+					 "Found ACPI device %s (enabled=%d)\n",
+					 dev_name(&adev->dev),
+					 adev->status.enabled);
+
+				if (!adev->status.enabled) {
+					dev_info(isp->dev,
+						 "Skipping disabled device %s\n",
+						 dev_name(&adev->dev));
+					continue;
+				}
+
+				clock_num =
+					atomisp_csi2_get_pmc_clk_nr_from_acpi_pr0(adev);
+				dev_info(isp->dev,
+					 "%s: clock_num=%d\n",
+					 dev_name(&adev->dev), clock_num);
+
+				atomisp_csi2_set_pmc_clk_freq(adev, clock_num);
+
+				port = atomisp_csi2_get_port(adev, clock_num);
+				dev_info(isp->dev,
+					 "%s: port=%d\n",
+					 dev_name(&adev->dev), port);
+
+				if (port >= ATOMISP_CAMERA_NR_PORTS) {
+					dev_err(isp->dev,
+						"%s: invalid port %d >= %d\n",
+						dev_name(&adev->dev), port,
+						ATOMISP_CAMERA_NR_PORTS);
+					acpi_dev_put(adev);
+					break;
+				}
+
+				lanes = gmin_cfg_get_int(adev, "CsiLanes", 1);
+				mipi_port =
+					atomisp_port_to_mipi_port(isp, port);
+				isp->sensor_lanes[mipi_port] = lanes;
+
+				dev_info(isp->dev,
+					 "%s: adding async fwnode %p\n",
+					 dev_name(&adev->dev),
+					 acpi_fwnode_handle(adev));
+
+				s_asd = v4l2_async_nf_add_fwnode(
+					&isp->notifier,
+					acpi_fwnode_handle(adev),
+					struct sensor_async_subdev);
+				acpi_dev_put(adev);
+
+				if (IS_ERR(s_asd)) {
+					dev_err(isp->dev,
+						"Failed to add async connection for %s: %ld\n",
+						*hid, PTR_ERR(s_asd));
+					break;
+				}
+
+				s_asd->port = port;
+				found++;
+				dev_info(isp->dev,
+					 "Registered fallback sensor %s on port %d (%d lanes)\n",
+					 *hid, port, lanes);
+				break;
+			}
+		}
+
+		dev_info(isp->dev,
+			 "Fallback scan complete: %d sensors added\n", found);
+	}
+
 	return 0;
 }

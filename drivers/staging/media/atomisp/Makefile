@@ -9,7 +9,11 @@ obj-$(CONFIG_VIDEO_ATOMISP) += pci/atomisp_gmin_platform.o
 # While on staging, keep debug enabled
 DEFINES += -DDEBUG
 
+ifdef M
+atomisp = $(M)/
+else
 atomisp = $(srctree)/drivers/staging/media/atomisp/
+endif
 
 # SPDX-License-Identifier: GPL-2.0
 atomisp-objs += \
@@ -302,3 +306,9 @@ DEFINES := -DHRT_HW -DHRT_ISP_CSS_CUSTOM_HOST -DHRT_USE_VIR_ADDRS -D__HOST__
 #DEFINES += -DUSE_KMEM_CACHE
 
 ccflags-y += $(INCLUDES) $(DEFINES) -fno-common
+
+# For out-of-tree builds: trace include path and atomisp include path
+ifdef M
+CFLAGS_atomisp_cmd.o += -I$(M)/pci
+ccflags-y += -I$(M)/../../../include
+endif

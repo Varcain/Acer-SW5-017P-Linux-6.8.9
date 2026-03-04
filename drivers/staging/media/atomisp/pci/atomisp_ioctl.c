@@ -1724,6 +1724,22 @@ static int atomisp_g_parm(struct file *file, void *fh,
 
 	parm->parm.capture.capturemode = asd->run_mode->val;
 
+	/* Query sensor for frame interval so userspace gets valid fps */
+	{
+		struct v4l2_subdev_frame_interval fi = {
+			.which = V4L2_SUBDEV_FORMAT_ACTIVE,
+		};
+		int rval;
+
+		rval = v4l2_subdev_call_state_active(
+			isp->inputs[asd->input_curr].camera,
+			pad, get_frame_interval, &fi);
+		if (!rval && fi.interval.numerator) {
+			parm->parm.capture.timeperframe = fi.interval;
+			parm->parm.capture.capability = V4L2_CAP_TIMEPERFRAME;
+		}
+	}
+
 	return 0;
 }
 
