@@ -78,10 +78,10 @@ static const struct dmi_system_id dmi_use_low_level_irq[] = {
 		},
 	},
 	{
-		/* Acer Switch V 10 SW5-017, same issue as Acer Switch 10 SW5-012. */
+		/* Acer Switch V 10 SW5-017P, same issue as Acer Switch 10 SW5-012. */
 		.matches = {
 			DMI_MATCH(DMI_SYS_VENDOR, "Acer"),
-			DMI_MATCH(DMI_PRODUCT_NAME, "SW5-017"),
+			DMI_MATCH(DMI_PRODUCT_NAME, "SW5-017P"),
 		},
 	},
 	{
