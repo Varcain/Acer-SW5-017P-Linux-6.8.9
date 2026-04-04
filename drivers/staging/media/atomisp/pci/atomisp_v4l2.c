@@ -856,6 +856,9 @@ static void atomisp_unregister_entities(struct atomisp_device *isp)
 	for (i = 0; i < ATOMISP_CAMERA_NR_PORTS; i++)
 		atomisp_mipi_csi2_unregister_entities(&isp->csi2_port[i]);
 
+	v4l2_async_nf_unregister(&isp->notifier);
+	v4l2_async_nf_cleanup(&isp->notifier);
+
 	list_for_each_entry_safe(sd, next, &isp->v4l2_dev.subdevs, list)
 		v4l2_device_unregister_subdev(sd);
 

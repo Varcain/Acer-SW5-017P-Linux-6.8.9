@@ -35,6 +35,8 @@
 #include "ia_css_isp_param.h"
 #include "sh_css_hrt.h"
 #include "ia_css_isys.h"
+#include "ia_css_device_access.h"
+#include "system_local.h"
 
 #include <linux/io.h>
 #include <linux/pm_runtime.h>
@@ -1006,6 +1008,90 @@ int atomisp_css_start(struct atomisp_sub_device *asd)
 			} else {
 				asd->stream_env[i].stream_state = CSS_STREAM_STARTED;
 				dev_dbg(isp->dev, "stream[%d] started.\n", i);
+			}
+
+			/*
+			 * LP LUT override: change depack from RAW10 to RAW8.
+			 * The SP programs LP LUT entries with MIPI_FMT matching
+			 * the configured format. We modify the entry to use
+			 * RAW8 (0x2A) instead of RAW10 (0x2B), then clear
+			 * GLOBAL_LUT_DISREGARD so the LUT is active.
+			 * Also disable custom depack to avoid interference.
+			 */
+			if (asd->stream_env[i].stream_config.force_raw8) {
+				unsigned int port =
+					asd->stream_env[i].stream_config.source.port.port;
+				hrt_address base = CSI_RX_BE_CTRL_BASE[port];
+				uint32_t lut_val, new_lut;
+				int li;
+
+				/* Dump LP LUT entries before modification */
+				for (li = 0; li < 4; li++) {
+					lut_val = ia_css_device_load_uint32(
+						base + (32 + li) * sizeof(uint32_t));
+					dev_info(isp->dev,
+						 "BE[%u] LP_LUT[%d]=0x%x (disregard=%d sid=%d ch=%d fmt=0x%x)\n",
+						 port, li, lut_val,
+						 lut_val & 1,
+						 (lut_val >> 1) & 3,
+						 (lut_val >> 3) & 3,
+						 (lut_val >> 5) & 0x3f);
+				}
+				dev_info(isp->dev,
+					 "BE[%u] DISREGARD=%d CUST_EN=0x%x FORCE_RAW8=0x%x\n",
+					 port,
+					 ia_css_device_load_uint32(base + 26 * sizeof(uint32_t)),
+					 ia_css_device_load_uint32(base + 11 * sizeof(uint32_t)),
+					 ia_css_device_load_uint32(base + 8 * sizeof(uint32_t)));
+
+				/*
+				 * Write LP LUT entries with RAW8 format (0x2A).
+				 * The SP left them at 0, so populate manually.
+				 * Entry format (sid_width=2 for Backend1):
+				 *   bit 0:    PKT_DISREGARD
+				 *   bits 2:1: SID
+				 *   bits 4:3: MIPI_CH_ID
+				 *   bits 10:5: MIPI_FMT
+				 * Write all 4 entries with fmt=RAW8(0x2A), ch=0,
+				 * each with a different SID to cover all possibilities.
+				 */
+				for (li = 0; li < 4; li++) {
+					new_lut = (0x2Au << 5) | (0 << 3) | (li << 1) | 0;
+					ia_css_device_store_uint32(
+						base + (32 + li) * sizeof(uint32_t),
+						new_lut);
+					dev_info(isp->dev,
+						 "BE[%u] LP_LUT[%d]: wrote 0x%x (sid=%d fmt=0x%x)\n",
+						 port, li, new_lut, li,
+						 (new_lut >> 5) & 0x3f);
+				}
+
+				/* Disable custom depacketization */
+				ia_css_device_store_uint32(
+					base + 11 * sizeof(uint32_t), 0);
+
+				/* Enable LP LUT (clear GLOBAL_LUT_DISREGARD) */
+				ia_css_device_store_uint32(
+					base + 26 * sizeof(uint32_t), 0);
+
+				/* Also try FORCE_RAW8 register */
+				ia_css_device_store_uint32(
+					base + 8 * sizeof(uint32_t),
+					(0x2B << 1) | 1);
+
+				dev_info(isp->dev,
+					 "BE[%u] after patch: DISREGARD=%d CUST_EN=0x%x\n",
+					 port,
+					 ia_css_device_load_uint32(base + 26 * sizeof(uint32_t)),
+					 ia_css_device_load_uint32(base + 11 * sizeof(uint32_t)));
+				for (li = 0; li < 4; li++) {
+					lut_val = ia_css_device_load_uint32(
+						base + (32 + li) * sizeof(uint32_t));
+					dev_info(isp->dev,
+						 "BE[%u] LP_LUT[%d]=0x%x (fmt=0x%x)\n",
+						 port, li, lut_val,
+						 (lut_val >> 5) & 0x3f);
+				}
 			}
 		}
 	}

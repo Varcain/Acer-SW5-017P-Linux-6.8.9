@@ -311,6 +311,13 @@ static struct gmin_cfg_var lenovo_ideapad_miix_310_vars[] = {
 	{}
 };
 
+static struct gmin_cfg_var acer_sw5_017_vars[] = {
+	/* HM2051 front camera has no _DSM, needs CsiPort=0 to avoid OV5670 conflict */
+	{ "HIMX2051:00_CsiPort",  "0" },
+	{ "HIMX2051:00_CsiLanes", "1" },
+	{},
+};
+
 static const struct dmi_system_id gmin_vars[] = {
 	/*
 	 * These DMI IDs were present when the atomisp driver was merged into
@@ -367,6 +374,14 @@ static const struct dmi_system_id gmin_vars[] = {
 			DMI_MATCH(DMI_PRODUCT_VERSION, "MIIX 310-10"),
 		},
 		.driver_data = lenovo_ideapad_miix_310_vars,
+	},
+	{
+		.ident = "Acer SW5-017P",
+		.matches = {
+			DMI_MATCH(DMI_SYS_VENDOR, "Acer"),
+			DMI_MATCH(DMI_PRODUCT_NAME, "SW5-017P"),
+		},
+		.driver_data = acer_sw5_017_vars,
 	},
 	{}
 };

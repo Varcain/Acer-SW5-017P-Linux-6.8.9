@@ -57,6 +57,16 @@ config VIDEO_ATOMISP_GC0310
 	  This is a Video4Linux2 sensor-level driver for the Galaxycore
 	  GC0310 0.3MP sensor.
 
+config VIDEO_ATOMISP_HM2051
+	tristate "Himax HM2051 sensor support"
+	depends on ACPI
+	depends on I2C && VIDEO_DEV
+	help
+	  This is a Video4Linux2 sensor driver for the Himax
+	  HM2051 2MP raw camera sensor (BGGR, 1-lane MIPI CSI-2).
+
+	  It currently only works with the atomisp driver.
+
 config VIDEO_ATOMISP_OV5670
 	tristate "OV5670 sensor support for ATOMISP"
 	depends on ACPI

@@ -206,6 +206,7 @@ struct camera_mipi_info {
 	u32                             metadata_width;
 	u32                             metadata_height;
 	const u32                       *metadata_effective_width;
+	bool                            force_raw8;
 };
 
 const struct atomisp_platform_data *atomisp_get_platform_data(void);

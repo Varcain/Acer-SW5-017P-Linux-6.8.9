@@ -136,6 +136,9 @@ struct ia_css_stream_config {
 	     video or preview pipe (false).
 	     This setting needs to be enabled to allow raw buffer locking
 	     without continuous viewfinder. */
+	bool force_raw8; /** Force RAW8 depacketization in CSI RX backend
+			      for sensors that send RAW8 data with RAW10
+			      MIPI data type headers. */
 };
 
 struct ia_css_stream;

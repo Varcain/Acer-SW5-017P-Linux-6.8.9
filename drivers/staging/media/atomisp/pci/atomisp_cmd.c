@@ -3944,6 +3944,29 @@ static inline int atomisp_set_sensor_mipi_to_isp(
 	atomisp_css_input_set_format(asd, stream_id, input_format);
 	atomisp_css_input_set_bayer_order(asd, stream_id, bayer_order);
 
+	/*
+	 * For sensors that send RAW8 data with RAW10 MIPI data type headers,
+	 * override the isys format to RAW_10 so the CSI RX LUT accepts the
+	 * 0x2B packets. The FORCE_RAW8 hardware register (written at stream
+	 * start) makes the backend depacketize them as RAW8.
+	 */
+	if (mipi_info && mipi_info->force_raw8) {
+		struct ia_css_stream_config *s_config =
+			&asd->stream_env[stream_id].stream_config;
+
+		s_config->force_raw8 = true;
+		atomisp_css_isys_set_format(asd, stream_id,
+					    ATOMISP_INPUT_FORMAT_RAW_10,
+					    IA_CSS_STREAM_DEFAULT_ISYS_STREAM_IDX);
+		/* Override input_config.format to RAW_10 so ISP selects a
+		 * binary with Bayer demosaicing (no RAW_8 demosaic binary
+		 * exists in the firmware). bits_per_subpixel=8 in sh_css.c
+		 * tells the ISYS the actual data is 8-bit.
+		 */
+		atomisp_css_input_set_format(asd, stream_id,
+					     ATOMISP_INPUT_FORMAT_RAW_10);
+	}
+
 	fc = atomisp_find_in_fmt_conv_by_atomisp_in_fmt(metadata_format);
 	if (!fc)
 		return -EINVAL;

@@ -7,6 +7,7 @@ obj-$(CONFIG_VIDEO_ATOMISP_MT9M114)    += atomisp-mt9m114.o
 obj-$(CONFIG_VIDEO_ATOMISP_GC2235)     += atomisp-gc2235.o
 obj-$(CONFIG_VIDEO_ATOMISP_OV2722)     += atomisp-ov2722.o
 obj-$(CONFIG_VIDEO_ATOMISP_GC0310)     += atomisp-gc0310.o
+obj-$(CONFIG_VIDEO_ATOMISP_HM2051)     += atomisp-hm2051.o
 obj-$(CONFIG_VIDEO_ATOMISP_OV5670)     += atomisp-ov5670.o
 atomisp-ov5670-objs                    := ov5670_atomisp.o
 

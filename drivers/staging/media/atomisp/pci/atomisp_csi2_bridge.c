@@ -106,6 +106,13 @@ static struct gmin_cfg_var lenovo_ideapad_miix_310_vars[] = {
 	{}
 };
 
+static struct gmin_cfg_var acer_sw5_017_bridge_vars[] = {
+	/* HM2051 front camera has no _DSM, needs CsiPort=0 */
+	{ "HIMX2051:00", "CsiPort", "0" },
+	{ "HIMX2051:00", "CsiLanes", "1" },
+	{}
+};
+
 static const struct dmi_system_id gmin_cfg_dmi_overrides[] = {
 	{
 		/* Lenovo Ideapad Miix 310 */
@@ -114,6 +121,14 @@ static const struct dmi_system_id gmin_cfg_dmi_overrides[] = {
 			DMI_MATCH(DMI_PRODUCT_VERSION, "MIIX 310-10"),
 		},
 		.driver_data = lenovo_ideapad_miix_310_vars,
+	},
+	{
+		/* Acer SW5-017P */
+		.matches = {
+			DMI_MATCH(DMI_SYS_VENDOR, "Acer"),
+			DMI_MATCH(DMI_PRODUCT_NAME, "SW5-017P"),
+		},
+		.driver_data = acer_sw5_017_bridge_vars,
 	},
 	{}
 };
@@ -727,6 +742,7 @@ err_parse:
 	{
 		static const char * const fallback_hids[] = {
 			"OVTI5670",	/* OV5670 on Acer SW5-017P */
+			"HIMX2051",	/* HM2051 on Acer SW5-017P */
 			NULL,
 		};
 		const char * const *hid;
