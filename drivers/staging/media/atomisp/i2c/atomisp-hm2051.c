@@ -621,7 +621,7 @@ static int hm2051_init_controls(struct hm2051_device *dev)
 	/* Analog gain: 0=1x, 1=2x, 2=4x, 3=8x */
 	dev->ctrls.gain =
 		v4l2_ctrl_new_std(hdl, &hm2051_ctrl_ops, V4L2_CID_GAIN,
-				  0, 3, 1, 1);
+				  0, 3, 1, 3);
 
 	return hdl->error;
 }
