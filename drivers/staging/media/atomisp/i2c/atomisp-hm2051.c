@@ -27,7 +27,7 @@
 #include "../include/linux/atomisp_gmin_platform.h"
 
 #define HM2051_NATIVE_WIDTH		1296
-#define HM2051_NATIVE_HEIGHT		1200
+#define HM2051_NATIVE_HEIGHT		736
 
 #define HM2051_FPS			30
 #define HM2051_SKIP_FRAMES		3
@@ -230,7 +230,7 @@ static const struct hm2051_reg hm2051_init_regs[] = {
 	{0x0160, 0x65},
 	{0x0123, 0xD5},
 
-	/* Crop window — CM-CHT original (X:160-1455, Y:46-781) */
+	/* Crop window — X:160-1455 (1296 wide), Y:46-781 (736 tall, active area) */
 	{0x0660, 0x00},
 	{0x0661, 0xA0},
 	{0x0662, 0x05},
