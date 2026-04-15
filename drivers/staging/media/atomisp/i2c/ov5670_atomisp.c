@@ -1204,20 +1204,34 @@ static int ov5670_set_stream(struct v4l2_subdev *sd, int enable)
 		dev_info(&client->dev, "Configured mode %dx%d, starting stream\n",
 			 ov5670->cur_mode->width, ov5670->cur_mode->height);
 
-		/* 4. Start streaming */
+		/* 4. Force manual AEC/AGC so V4L2 controls take effect */
+		ov5670_write_reg(ov5670, 0x3503, OV5670_REG_VALUE_08BIT, 0x03);
+
+		/* 5. Apply V4L2 control values (exposure, gain) */
+		ov5670->streaming = true;
+		ret = __v4l2_ctrl_handler_setup(&ov5670->ctrl_handler);
+		if (ret) {
+			dev_err(&client->dev, "Failed to apply controls\n");
+			ov5670->streaming = false;
+			mutex_unlock(&ov5670->mutex);
+			return ret;
+		}
+
+		/* 6. Start streaming */
 		ret = ov5670_write_reg(ov5670, OV5670_REG_STREAM_CTRL,
 				       OV5670_REG_VALUE_08BIT, 0x01);
 		if (ret) {
 			dev_err(&client->dev, "Failed to start streaming\n");
+			ov5670->streaming = false;
 			mutex_unlock(&ov5670->mutex);
 			return ret;
 		}
+
 	} else {
 		ret = ov5670_write_reg(ov5670, OV5670_REG_STREAM_CTRL,
 				       OV5670_REG_VALUE_08BIT, 0x00);
+		ov5670->streaming = false;
 	}
-
-	ov5670->streaming = enable;
 	mutex_unlock(&ov5670->mutex);
 
 	return ret;
@@ -1477,11 +1491,11 @@ static int ov5670_init_controls(struct ov5670 *ov5670)
 	/* Exposure */
 	ov5670->exposure = v4l2_ctrl_new_std(ctrl_hdlr, &ov5670_ctrl_ops,
 					     V4L2_CID_EXPOSURE,
-					     4, 65535, 1, 256);
+					     4, 65535, 1, 2048);
 
-	/* Analogue gain */
+	/* Analogue gain: value/128 = real gain. 128=1x, 256=2x, 512=4x */
 	v4l2_ctrl_new_std(ctrl_hdlr, &ov5670_ctrl_ops,
-			  V4L2_CID_ANALOGUE_GAIN, 128, 8191, 1, 128);
+			  V4L2_CID_ANALOGUE_GAIN, 128, 8191, 1, 384);
 
 	if (ctrl_hdlr->error) {
 		ret = ctrl_hdlr->error;

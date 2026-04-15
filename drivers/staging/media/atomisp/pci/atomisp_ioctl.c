@@ -1132,6 +1132,13 @@ int atomisp_start_streaming(struct vb2_queue *vq, unsigned int count)
 	/* Invalidate caches. FIXME: should flush only necessary buffers */
 	wbinvd();
 
+	/* Apply edge enhancement for better sharpness */
+	asd->params.css_param.ee_config.gain = 10240;      /* u5.11: 5x sharpening */
+	asd->params.css_param.ee_config.threshold = 256;   /* u8.8: noise gate */
+	asd->params.css_param.ee_config.detail_gain = 4096; /* u5.11: 2x detail */
+	asd->params.config.ee_config = &asd->params.css_param.ee_config;
+	asd->params.css_update_params_needed = true;
+
 	if (asd->params.css_update_params_needed) {
 		atomisp_apply_css_parameters(asd, &asd->params.css_param);
 		if (asd->params.css_param.update_flag.dz_config)
