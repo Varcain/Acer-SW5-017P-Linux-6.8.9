@@ -951,6 +951,13 @@ int atomisp_start_streaming(struct vb2_queue *vq, unsigned int count)
 	/* Invalidate caches. FIXME: should flush only necessary buffers */
 	wbinvd();
 
+	/* Apply edge enhancement for better sharpness */
+	asd->params.css_param.ee_config.gain = 10240;      /* u5.11: 5x sharpening */
+	asd->params.css_param.ee_config.threshold = 256;   /* u8.8: noise gate */
+	asd->params.css_param.ee_config.detail_gain = 4096; /* u5.11: 2x detail */
+	asd->params.config.ee_config = &asd->params.css_param.ee_config;
+	asd->params.css_update_params_needed = true;
+
 	if (asd->params.css_update_params_needed) {
 		atomisp_apply_css_parameters(asd, &asd->params.css_param);
 		if (asd->params.css_param.update_flag.dz_config)
@@ -1296,6 +1303,22 @@ static int atomisp_g_parm(struct file *file, void *fh,
 	}
 
 	parm->parm.capture.capturemode = asd->run_mode->val;
+
+	/* Query sensor for frame interval so userspace gets valid fps */
+	{
+		struct v4l2_subdev_frame_interval fi = {
+			.which = V4L2_SUBDEV_FORMAT_ACTIVE,
+		};
+		int rval;
+
+		rval = v4l2_subdev_call_state_active(
+			isp->inputs[asd->input_curr].sensor,
+			pad, get_frame_interval, &fi);
+		if (!rval && fi.interval.numerator) {
+			parm->parm.capture.timeperframe = fi.interval;
+			parm->parm.capture.capability = V4L2_CAP_TIMEPERFRAME;
+		}
+	}
 
 	return 0;
 }

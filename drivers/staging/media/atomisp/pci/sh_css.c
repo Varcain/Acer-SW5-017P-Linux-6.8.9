@@ -818,6 +818,11 @@ static bool sh_css_translate_stream_cfg_to_input_system_input_port_resolution(
 	if (bits_per_subpixel == 0)
 		return false;
 
+	/* When force_raw8, the actual pixel data is 8-bit regardless of the
+	 * MIPI data type used for CSI RX LUT matching. */
+	if (stream_cfg->force_raw8)
+		bits_per_subpixel = 8;
+
 	max_subpixels_per_line =
 	    csi2_protocol_calculate_max_subpixels_per_line(fmt_type,
 		    stream_cfg->isys_config[isys_stream_idx].input_res.width);
@@ -981,6 +986,26 @@ sh_css_config_input_network_2401(struct ia_css_stream *stream)
 			ia_css_isys_stream_destroy(
 			    &sp_pipeline_input_terminal->context.virtual_input_system_stream[i]);
 			return -EINVAL;
+		}
+	}
+
+	/*
+	 * For sensors that send RAW8 pixel data tagged with RAW10 MIPI data
+	 * type (0x2B): dump backend registers before SP firmware start.
+	 * The actual LP LUT patching happens after stream start in
+	 * atomisp_compat_css20.c.
+	 */
+	if (stream->config.force_raw8) {
+		unsigned int port = stream->config.source.port.port;
+		hrt_address base = CSI_RX_BE_CTRL_BASE[port];
+		int i;
+
+		pr_info("CSI_RX_BE[%u] base=0x%llx pre-start dump:\n",
+			port, (unsigned long long)base);
+		for (i = 0; i < 36; i++) {
+			uint32_t val = ia_css_device_load_uint32(
+				base + i * sizeof(uint32_t));
+			pr_info("  BE[%u] reg[%2d] = 0x%08x\n", port, i, val);
 		}
 	}
 
