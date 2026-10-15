@@ -26,3 +26,24 @@ config VIDEO_ATOMISP_GC2235
 	  GC2235 is a 2M raw sensor.
 
 	  It currently only works with the atomisp driver.
+
+config VIDEO_ATOMISP_HM2051
+	tristate "Himax HM2051 sensor support"
+	depends on ACPI
+	depends on I2C && VIDEO_DEV
+	help
+	  This is a Video4Linux2 sensor driver for the Himax
+	  HM2051 2MP raw camera sensor (BGGR, 1-lane MIPI CSI-2).
+
+	  It currently only works with the atomisp driver.
+
+config VIDEO_ATOMISP_OV5670
+	tristate "OV5670 sensor support for ATOMISP"
+	depends on ACPI
+	depends on I2C && VIDEO_DEV
+	help
+	  This is a Video4Linux2 sensor driver for the OmniVision OV5670
+	  5MP camera sensor, adapted for Cherry Trail ATOMISP platforms
+	  (e.g. Acer SW5-017P). Uses OVTI5670 ACPI HID and 19.2MHz PMC clock.
+
+	  It currently only works with the atomisp driver.
