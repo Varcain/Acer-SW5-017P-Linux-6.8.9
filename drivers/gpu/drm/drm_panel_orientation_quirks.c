@@ -170,7 +170,7 @@ static const struct dmi_system_id orientation_data[] = {
 	}, {	/* Acer Switch V 10 (SW5-017) */
 		.matches = {
 		  DMI_EXACT_MATCH(DMI_SYS_VENDOR, "Acer"),
-		  DMI_EXACT_MATCH(DMI_PRODUCT_NAME, "SW5-017"),
+		  DMI_MATCH(DMI_PRODUCT_NAME, "SW5-017"),
 		},
 		.driver_data = (void *)&lcd800x1280_rightside_up,
 	}, {	/* Anbernic Win600 */
