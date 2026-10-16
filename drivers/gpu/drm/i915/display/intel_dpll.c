@@ -404,6 +404,14 @@ void i9xx_dpll_get_hw_state(struct intel_crtc *crtc,
 			tmp = intel_de_read(display,
 					    DPLL_MD(display, crtc->pipe));
 
+		/*
+		 * The GOP leaves VGA-only UDI fields set (e.g. 0x3 on the Acer
+		 * SW5-017P DSI panel); the driver never programs them, so they
+		 * would make every fastset fail and force a full modeset.
+		 */
+		if (display->platform.valleyview || display->platform.cherryview)
+			tmp &= DPLL_MD_UDI_MULTIPLIER_MASK;
+
 		hw_state->dpll_md = tmp;
 	}
 
