@@ -911,6 +911,96 @@ static void atomisp_stop_stream(struct atomisp_video_pipe *pipe,
 	media_pipeline_stop(&asd->video_out.vdev.entity.pads[0]);
 }
 
+/*
+ * Per-sensor ISP defaults. Without them the ISP runs with unity white
+ * balance gains and no black level subtraction: the OV5670 pedestal turns
+ * into a grey veil and both sensors show a strong yellow/green cast.
+ * The white balance gains are a neutral starting point for indoor light;
+ * userspace can override them with ATOMISP_IOC_S_ISP_WHITE_BALANCE.
+ * Both sensors need high analogue gain indoors, so they get stronger Bayer
+ * and YCC noise reduction (the CSS defaults leave heavy grain).
+ * Saturation is a uniform scale of the U/V plane in all 16 MACC hue
+ * sectors (MACC2 on ISP2401: s1.12, 4096 = 1.0, max just under 2.0).
+ */
+struct atomisp_sensor_tuning {
+	const char *name;	/* sensor subdev name prefix */
+	u16 black_level;	/* in 10-bit sensor codes */
+	u16 wb_r, wb_b;		/* R and B gain relative to G, x1000 */
+	u16 bnr_gain, ynr_gain;	/* u0.16 NR strength, 0 = keep CSS default */
+	u16 saturation;		/* x100, 0 = keep CSS default */
+};
+
+static const struct atomisp_sensor_tuning atomisp_sensor_tunings[] = {
+	{ "ov5670", 64, 1200, 2400, 49152, 32768, 195 },
+	{ "hm2051", 0, 950, 1600, 49152, 32768, 195 },
+};
+
+static void atomisp_apply_sensor_tuning(struct atomisp_sub_device *asd)
+{
+	struct v4l2_subdev *sensor = asd->isp->inputs[asd->input_curr].sensor;
+	const struct atomisp_sensor_tuning *t = NULL;
+	struct atomisp_css_params *p = &asd->params.css_param;
+	unsigned int i;
+
+	if (!sensor)
+		return;
+
+	for (i = 0; i < ARRAY_SIZE(atomisp_sensor_tunings); i++) {
+		if (!strncmp(sensor->name, atomisp_sensor_tunings[i].name,
+			     strlen(atomisp_sensor_tunings[i].name))) {
+			t = &atomisp_sensor_tunings[i];
+			break;
+		}
+	}
+	if (!t)
+		return;
+
+	if (t->black_level) {
+		u32 lvl = DIV_ROUND_CLOSEST(t->black_level * 65535U, 1023);
+
+		p->ob_config.mode = IA_CSS_OB_MODE_FIXED;
+		p->ob_config.level_gr = lvl;
+		p->ob_config.level_r = lvl;
+		p->ob_config.level_b = lvl;
+		p->ob_config.level_gb = lvl;
+		asd->params.config.ob_config = &p->ob_config;
+	}
+
+	/* u2.14 gains, up to ~4x */
+	p->wb_config.integer_bits = 2;
+	p->wb_config.gr = 1 << 14;
+	p->wb_config.gb = 1 << 14;
+	p->wb_config.r = DIV_ROUND_CLOSEST(t->wb_r << 14, 1000);
+	p->wb_config.b = DIV_ROUND_CLOSEST(t->wb_b << 14, 1000);
+	asd->params.config.wb_config = &p->wb_config;
+
+	if (t->bnr_gain || t->ynr_gain) {
+		/* CSS defaults: bnr 16384, ynr 8192, direction 1280 */
+		p->nr_config.bnr_gain = t->bnr_gain ? t->bnr_gain : 16384;
+		p->nr_config.ynr_gain = t->ynr_gain ? t->ynr_gain : 8192;
+		p->nr_config.direction = 1280;
+		p->nr_config.threshold_cb = 0;
+		p->nr_config.threshold_cr = 0;
+		asd->params.config.nr_config = &p->nr_config;
+	}
+
+	if (t->saturation) {
+		s16 v = min(DIV_ROUND_CLOSEST(t->saturation * 4096, 100), 8191);
+
+		for (i = 0; i < IA_CSS_MACC_NUM_AXES; i++) {
+			p->macc_table.data[4 * i + 0] = v;
+			p->macc_table.data[4 * i + 1] = 0;
+			p->macc_table.data[4 * i + 2] = 0;
+			p->macc_table.data[4 * i + 3] = v;
+		}
+		asd->params.config.macc_table = &p->macc_table;
+	}
+
+	asd->params.css_update_params_needed = true;
+	dev_dbg(asd->isp->dev, "%s: black level %u, wb r %u b %u, saturation %u%%\n",
+		sensor->name, t->black_level, t->wb_r, t->wb_b, t->saturation);
+}
+
 int atomisp_start_streaming(struct vb2_queue *vq, unsigned int count)
 {
 	struct atomisp_video_pipe *pipe = vq_to_pipe(vq);
@@ -957,6 +1047,8 @@ int atomisp_start_streaming(struct vb2_queue *vq, unsigned int count)
 	asd->params.css_param.ee_config.detail_gain = 4096; /* u5.11: 2x detail */
 	asd->params.config.ee_config = &asd->params.css_param.ee_config;
 	asd->params.css_update_params_needed = true;
+
+	atomisp_apply_sensor_tuning(asd);
 
 	if (asd->params.css_update_params_needed) {
 		atomisp_apply_css_parameters(asd, &asd->params.css_param);
@@ -1379,9 +1471,43 @@ static int atomisp_s_parm(struct file *file, void *fh,
 static long atomisp_vidioc_default(struct file *file, void *fh,
 				   bool valid_prio, unsigned int cmd, void *arg)
 {
-	/* Disable all private IOCTLs for now! */
-	if (cmd)
+	/*
+	 * Most private IOCTLs stay disabled: several of them carry user
+	 * pointers that are not properly validated. Allow the fixed-size ISP
+	 * tuning parameters, so that userspace can do white balance, black
+	 * level, gamma, colour correction and noise reduction.
+	 */
+	switch (cmd) {
+	case ATOMISP_IOC_G_XNR:
+	case ATOMISP_IOC_S_XNR:
+	case ATOMISP_IOC_G_NR:
+	case ATOMISP_IOC_S_NR:
+	case ATOMISP_IOC_G_TNR:
+	case ATOMISP_IOC_S_TNR:
+	case ATOMISP_IOC_G_BLACK_LEVEL_COMP:
+	case ATOMISP_IOC_S_BLACK_LEVEL_COMP:
+	case ATOMISP_IOC_G_EE:
+	case ATOMISP_IOC_S_EE:
+	case ATOMISP_IOC_G_ISP_GAMMA:
+	case ATOMISP_IOC_S_ISP_GAMMA:
+	case ATOMISP_IOC_G_ISP_MACC:
+	case ATOMISP_IOC_S_ISP_MACC:
+	case ATOMISP_IOC_G_ISP_BAD_PIXEL_DETECTION:
+	case ATOMISP_IOC_S_ISP_BAD_PIXEL_DETECTION:
+	case ATOMISP_IOC_G_ISP_FALSE_COLOR_CORRECTION:
+	case ATOMISP_IOC_S_ISP_FALSE_COLOR_CORRECTION:
+	case ATOMISP_IOC_G_ISP_CTC:
+	case ATOMISP_IOC_S_ISP_CTC:
+	case ATOMISP_IOC_G_ISP_WHITE_BALANCE:
+	case ATOMISP_IOC_S_ISP_WHITE_BALANCE:
+	case ATOMISP_IOC_G_3A_CONFIG:
+	case ATOMISP_IOC_S_3A_CONFIG:
+	case ATOMISP_IOC_G_ISP_GAMMA_CORRECTION:
+	case ATOMISP_IOC_S_ISP_GAMMA_CORRECTION:
+		break;
+	default:
 		return -EINVAL;
+	}
 
 	struct video_device *vdev = video_devdata(file);
 	struct atomisp_sub_device *asd = atomisp_to_video_pipe(vdev)->asd;
