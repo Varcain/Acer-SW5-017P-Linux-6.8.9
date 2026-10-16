@@ -1495,7 +1495,7 @@ static int ov5670_init_controls(struct ov5670 *ov5670)
 
 	/* Analogue gain: value/128 = real gain. 128=1x, 256=2x, 512=4x */
 	v4l2_ctrl_new_std(ctrl_hdlr, &ov5670_ctrl_ops,
-			  V4L2_CID_ANALOGUE_GAIN, 128, 8191, 1, 384);
+			  V4L2_CID_ANALOGUE_GAIN, 128, 8191, 1, 1024);
 
 	if (ctrl_hdlr->error) {
 		ret = ctrl_hdlr->error;
