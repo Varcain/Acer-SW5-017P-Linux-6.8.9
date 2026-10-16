@@ -296,15 +296,28 @@ static int hm2051_s_ctrl(struct v4l2_ctrl *ctrl)
 {
 	struct hm2051_device *dev =
 		container_of(ctrl->handler, struct hm2051_device, ctrls.handler);
+	struct i2c_client *client = v4l2_get_subdevdata(&dev->sd);
+	int ret;
 
 	switch (ctrl->id) {
 	case V4L2_CID_EXPOSURE:
-		return hm2051_exposure_set(dev, ctrl->val);
+		ret = hm2051_exposure_set(dev, ctrl->val);
+		break;
 	case V4L2_CID_GAIN:
-		return hm2051_gain_set(dev, ctrl->val);
+		ret = hm2051_gain_set(dev, ctrl->val);
+		break;
 	default:
 		return -EINVAL;
 	}
+	if (ret)
+		return ret;
+
+	/*
+	 * Exposure and gain are double buffered; they only take effect after
+	 * a CMU update (0x0100 = 1). Without it changes made while streaming
+	 * are ignored until the next stream start.
+	 */
+	return hm2051_write_reg(client, 0x0100, 0x01);
 }
 
 static const struct v4l2_ctrl_ops hm2051_ctrl_ops = {
@@ -613,10 +626,14 @@ static int hm2051_init_controls(struct hm2051_device *dev)
 	hdl->lock = &dev->input_lock;
 	dev->sd.ctrl_handler = hdl;
 
-	/* Exposure: 16-bit coarse integration time. */
+	/*
+	 * Exposure: 16-bit coarse integration time in lines. The frame is
+	 * ~1300 lines at 30 fps; longer exposures stretch the frame (2048
+	 * gives ~19 fps), so default to just under one frame.
+	 */
 	dev->ctrls.exposure =
 		v4l2_ctrl_new_std(hdl, &hm2051_ctrl_ops, V4L2_CID_EXPOSURE,
-				  1, 0xFFFF, 1, 0x0800);
+				  1, 0xFFFF, 1, 1280);
 
 	/* Analog gain: 0=1x, 1=2x, 2=4x, 3=8x */
 	dev->ctrls.gain =
