@@ -750,7 +750,13 @@ static const struct dmi_system_id acer_quirks[] __initconst = {
 			DMI_EXACT_MATCH(DMI_SYS_VENDOR, "Acer"),
 			DMI_MATCH(DMI_PRODUCT_NAME, "SW5-017"),
 		},
-		.driver_data = (void *)ACER_CAP_KBD_DOCK,
+		/*
+		 * The firmware only sends keyboard dock WMI events once
+		 * Launch Manager mode is enabled (WMID.LMST), which needs
+		 * ACER_CAP_SET_FUNCTION_MODE.
+		 */
+		.driver_data = (void *)(ACER_CAP_KBD_DOCK |
+					ACER_CAP_SET_FUNCTION_MODE),
 	},
 	{
 		.callback = set_force_caps,
